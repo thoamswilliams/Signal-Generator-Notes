@@ -77,7 +77,7 @@
 
 \begin{document}
     \section*{Fri 2/23}
-    \subsection*{Function generator general explorations}
+    \subsection*{Function generator general exploration}
     Using the built-in controls of the function generator (AFG), I generated waveforms using the built-in menu options (e.g. sine, square, pulse,) and displayed the signals on the oscilloscope. I also familiarized myself with the various functions and controls on the oscilloscope and AFG.
     \subsubsection*{Phase difference due to cables}
     Both channels on the AFG were set to 6MHz, 200m$V_{pp},$ with a phase offset of $0,$ and were connected to channels 1 and 2 on the oscilloscope. Even after the "Align Phase" option on the AFG is enabled, the oscilloscope still shows a slight phase difference: 
@@ -85,15 +85,29 @@
     \includegraphics[width = 3.5in]{img/phase_difference.jpg}
     \\Peak-to-peak difference of 8.4ns between CH1 (yellow) and CH2 (blue)
     \end{mdframed}
-    Most likely, this is due to the difference in wire lengths, as the CH2 wire was 70cm, while the CH1 wire was 210cm long. We can use this to calculate the speed of the signal:
+    This could be due to the difference in wire lengths, as the CH2 wire was 70cm, while the CH1 wire was 210cm long. We can use this to very roughly calculate the speed of the signal:
     $$v = \frac{\Delta \ell}{\Delta t} = \frac{140cm}{8.4ns} \approx 0.55c$$
-    which seems reasonable for electrons in copper
-    \subsection*{Programming the function generator with a computer}
+    which seems reasonable for electrons in copper wire. \textbf{TODO: get two cables of the same length and verify that this is actually the case.}
+    \subsection*{Programming the function generator with a computer (LAN)}
     Useful resources:
     \begin{itemize}
     \item \href{https://acidbourbon.wordpress.com/2019/09/12/send-numpy-data-to-rigol-dg4202-arbitrary-waveform-generator-via-lan/}{Example using LAN and Python}
     \item \href{https://www.eevblog.com/forum/testgear/dg4000dg4162-scpi-arbitrary-waveform-programming/}{General info about programming}
     \item \href{https://www.eevblog.com/forum/testgear/dg4000-a-firmware-investigation/}{Deeper dive into firmware}
+    \item Programming Reference: \textbf{DG4000\_ProgrammingGuide\_EN.chm} (in the repo)
+    \item \href{https://download.rigol.com/cn/Software/UltraSigma.zip}{Download Ultra Sigma Software}
     \end{itemize}
-    A script for 
+    A script for sending a waveform to the AFV via LAN can be found in the Python file \textbf{LAN\_waveform\_test.py}, and follows the tutorial in the first link\\\\
+    Setup: Connect the AFG to the computer by Ethernet, go to Utility $\to$ I/O $\to$ LAN and ensure the IP address matches the one in the script. Then, use the script to specify the desired waveform functions, frequency, and voltage range.
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 5.8in]
+    \includegraphics[width = 5.5in]{img/LAN_signal.png}
+    \\Left: plot of waveform made with plt; Right: waveform on oscilloscope. Waves are $\sin^2(x)$ (blue) and step function. 500kHZ, 1$V_{pp}$.
+    \end{mdframed}
+    \subsection*{Ultra Sigma Software}
+    The built-in software provided by Rigol is Ultra Sigma. The features when connecting with LAN seem redundant, as it only gives access to the same SCPI commands that we previously sent using the Python interface, and has no way of interfacing with NumPy or external files.
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
+    \includegraphics[width = 4.5in]{img/ultraSigmaInterfaceLAN.png}
+    \\Ultra Sigma LAN interface
+    \end{mdframed}
+    Connecting via the USB-B port on the back of the AFG yields the same interface. There is the Ultra Station software that offers more tools for making waveforms, but it is paid and requires a licence. Therefore, LAN/python seems like the best approach moving forward unless we need any advanced features that cannot be reasonably implemented in that approach.
 \end{document}
