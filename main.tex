@@ -171,9 +171,9 @@
     \newpage
     \section*{Monday 3/4}
     \subsection*{Spectrum Analyzer}
-    The spectrum analyzer could not be located on Monday afternoon.
+    Again, the spectrum analyzer could not be located on Monday afternoon.
     \subsection*{Sending Windowed Function to the AWG}
-    Now, we proceed to test this using the AWG and oscilloscope. Using the code from before to send the function to the AWG, we pre- and post-pad the waveform with an equal length of zeroes.
+    The file for this test is \textbf{fourier\_analysis.ipynb}. Now, we proceed to test this using the AWG and oscilloscope. Using the code from before to send the function to the AWG, we pre- and post-pad the waveform with an equal length of zeroes.
     \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
     \includegraphics[width = 4.5in]{img/oscilloscope waveform.png}
     \end{mdframed}
@@ -184,5 +184,69 @@
     When we compute the Fourier transform using numpy, we see that the windowed waveform shows less spectral leakage, which is the same result as in the simulation from before.
     \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
     \includegraphics[width = 4.5in]{img/oscilloscopeTransform.png}
+    \end{mdframed}
+    \section*{Friday 3/8}
+    \subsection*{Testing High frequency signals}
+    The goal is to generate an arbitrary signal with frequencies in the range $80-90 MHz$ with a length that is as long as possible, with a target of $10ms.$ The main limiting factor is the interface used to program the AWG to generate arbitrary signals, which allows at most $16384$ samples in the signal.
+    \subsubsection*{Coding Cleanup}
+    In \textbf{LAN\_waveform\_test.py}, I wrote a basic AWG class that can be instantiated over LAN and subsequently be called to send waveforms to each channel, which is more streamlined to use than the previous codebase.\\\\
+    Note that the programming function supports a maximum of 512kib of data and 16ki points. Therefore if all 16ki points are to be used, the input values should each be no greater than 32 bits in size. 
+    \subsubsection*{Initial experiment}
+    Using the AWG, we generate a simple sine wave at a frequency of $80MHz$ and voltage $1V_{pp}$, and measure the frequency response using the spectral analyzer. The spectral analyzer displays the frequency response, which should ideally have a peak at the frequency of the signal, as shown:
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
+    \includegraphics[width = 4.5in]{img/spectralAnalyzer.jpg}
+    \end{mdframed}
+    We repeat the test by putting $n$ sine waveforms into the arbitrary signal for various $n$, which allows the period of the arbitrary waveform to be increased. However, at higher values of $n,$ the spectral quality will deteriorate, due to the limit in the number of sampling points. There were some additional problems that required debugging to resolve:
+    \begin{enumerate}
+    \item Currently, the program specifies the period of the waveform to the AWG, instead of the frequency. For small periods, corresponding to $~1MHz$, there is the risk of Python rounding them to 0, which requires special attention towards the numeric data-types to prevent
+    \item The command to write the waveform to the AWG does not seem to work consistently, particularly when the given waveform is long (closer to the 16384-sample limit), as the waveform sometimes does not change, which needs to be further investigated.
+    \end{enumerate}
+    \section*{Tuesday, 3/12} 
+    \subsection*{Resolving previous bugs}
+    I fixed the previous issue where writing to the AWG was inconsistent for larger sample sizes. While the documentation says that the programming function supports a maximum of 512 kib of data and 16ki points, using the full amount will actually result in a buffer overflow error. Instead, I found the following empirical limits:
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|}
+    \hline
+    Bits per sample & 32 & 16 & 8 \\ \hline
+    Max samples per waveform & 12000 & 16384 & 16384 \\ \hline
+    \end{tabular}
+    \end{table}
+    \textbf{If the overall 512kib data limit (16ki pts at 32 bits) is exceeded, then the AWG will freeze and indicate an error. However, if the total data is less than 512kib and the number of points exceeds the specified limits, then the AWG will fail silently.}
+    \subsection*{Spectral Fidelity experiment}
+    Now, we can conduct the experiment described last time, where we generate a 80Mhz sinusoidal waveform using the arbitrary waveform function, while increasing the period of the arbitrary waveform. This requires decreasing the sampling frequency, which will also decrease fidelity. We can then test the spectral quality using the spectral analyzer.\\\\
+    \textbf{The oscilloscope imposes a maximum frequency of 40MHz for arbitrary waveforms.} Therefore, we start with $n=2,$ where $n$ is the number of sinusoidal waves in the $16,384-$sample window. We also use a voltage of $1V_{pp}$ for all experiments.
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|l|l|l|}
+    \hline
+    n & 2 & 10 & 100 & 500 & 1000 & 5000 \\ \hline
+    Amplitude (dBm) & -4.12 & -4.78 & -4.9 & -5.6 & -8 & -15 \\ \hline
+    Signal Period ($\mu s$) & 0.025 & 0.125 & 1.25 & 6.25 & 12.5 & 62.5 \\ \hline
+    \end{tabular}
+    \end{table}
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 6in]
+    \includegraphics[width = 5.8in]{img/signal_quality_simple.png}\\
+    Oscilloscope view for $n = 4, 1000, 5000,$ showing the progressive deterioration of the signal.
+    \end{mdframed}
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 6in]
+    \includegraphics[width = 5.8in]{img/signal_quality_simple_spec.png}\\
+    Spectrum Analyzer for $n = 4, 1000, 5000,$ showing the progressive deterioration of the signal.
+    \end{mdframed}
+    We can repeat this experiment using the composition of 3 sinusoidal waveforms, with aligned phases and frequencies of $80,85,90$MHz, respectively. Here, $n$ is still defined in terms of the 90MHz wave. Because we want the signal to be fully periodic in the underlying waves, we have to choose $n$ to be a multiple of $16,$ so that the signal contains an integer number of each wave.
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|l|}
+    \hline
+    n & 16 & 160 & 480 & 1600 \\ \hline
+    Amplitude (dBm), 80MHz & -10.09 & -10.09 & -10.5 & -11.36 \\ \hline
+    Amplitude (dBm), 85MHz & -11.76 & -11.6 & -11.8 & -19.15 \\ \hline
+    Amplitude (dBm), 90MHz & -9.7 & -9.8 & -10.1 & -14.83 \\ \hline
+    Signal Period ($\mu s$) & 0.2 & 2 & 6 & 20 \\ \hline
+    \end{tabular}
+    \end{table}
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 6in]
+    \includegraphics[width = 5.8in]{img/signal_quality_multi_spec.png}\\
+    Spectrum Analyzer for $n = 16, 480, 1600,$ showing the progressive deterioration of the signal.
     \end{mdframed}
 \end{document}
