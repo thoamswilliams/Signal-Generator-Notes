@@ -160,7 +160,7 @@
     \subsubsection*{First proof of concept}
     \noindent Let us begin by defining a wave
     $$A(x) = \sin(50(2\pi x)) + \sin(80(2\pi x)),$$
-    and consider a sample in $x \in [0, 3/4].$ Because the sample is limited to an interval, it is implicitly windowed with an uniform window function. We can also consider the same sample but explicitly windowed with a Blackman window function:
+    and consider a sample in $x \in [0, 3/4].$ Because the sample is limited to an interval, it is implicitly windowed with an uniform window function ($A(x) = 0$ for $x \notin [0, 3/4]$). We can also consider the same sample but explicitly windowed with a Blackman window function:
     \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
     \includegraphics[width = 4.5in]{img/window_function_plot.png}
     \end{mdframed}
@@ -168,5 +168,21 @@
     \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 3.8in]
     \includegraphics[width = 3.5in]{img/WindowedLeakage.png}
     \end{mdframed}
-    Now, we proceed to test this using the AWG and oscilloscope. Use the code from before to send the function to the AWG:
+    \newpage
+    \section*{Monday 3/4}
+    \subsection*{Spectrum Analyzer}
+    The spectrum analyzer could not be located on Monday afternoon.
+    \subsection*{Sending Windowed Function to the AWG}
+    Now, we proceed to test this using the AWG and oscilloscope. Using the code from before to send the function to the AWG, we pre- and post-pad the waveform with an equal length of zeroes.
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
+    \includegraphics[width = 4.5in]{img/oscilloscope waveform.png}
+    \end{mdframed}
+    The waveforms are then sent to the oscilloscope with frequency 50KHz and amplitude $3V_{pp},$ and data is collected from the oscilloscope as a CSV file. Then, the time axis is multiplied by $50*10^3$ so that the frequencies of the data are the same as those shown on the previous page.
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
+    \includegraphics[width = 4.5in]{img/oscilloscopeOut.png}
+    \end{mdframed}
+    When we compute the Fourier transform using numpy, we see that the windowed waveform shows less spectral leakage, which is the same result as in the simulation from before.
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.8in]
+    \includegraphics[width = 4.5in]{img/oscilloscopeTransform.png}
+    \end{mdframed}
 \end{document}
