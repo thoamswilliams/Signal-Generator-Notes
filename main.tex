@@ -198,12 +198,13 @@
     \end{mdframed}
     We repeat the test by putting $n$ sine waveforms into the arbitrary signal for various $n$, which allows the period of the arbitrary waveform to be increased. However, at higher values of $n,$ the spectral quality will deteriorate, due to the limit in the number of sampling points. There were some additional problems that required debugging to resolve:
     \begin{enumerate}
+    \item The program buffer overflows when using in excess of 8,000 sample points given as 64-bit floats, causing the AWG to crash. To work around this problem, we switch to 32-bit floats.
     \item Currently, the program specifies the period of the waveform to the AWG, instead of the frequency. For small periods, corresponding to $~1MHz$, there is the risk of Python rounding them to 0, which requires special attention towards the numeric data-types to prevent
     \item The command to write the waveform to the AWG does not seem to work consistently, particularly when the given waveform is long (closer to the 16384-sample limit), as the waveform sometimes does not change, which needs to be further investigated.
     \end{enumerate}
     \section*{Tuesday, 3/12} 
     \subsection*{Resolving previous bugs}
-    I fixed the previous issue where writing to the AWG was inconsistent for larger sample sizes. While the documentation says that the programming function supports a maximum of 512 kib of data and 16ki points, using the full amount will actually result in a buffer overflow error. Instead, I found the following empirical limits:
+    I fixed the previous issue where writing to the AWG was inconsistent for larger sample sizes. While the documentation says that the programming function supports a maximum of 512 kib of data and 16,384 points, attempting to use the full amount will actually result in a buffer overflow error. Instead, I found the following empirical limits:
     \begin{table}[H]
     \centering
     \begin{tabular}{|l|l|l|l|}
@@ -212,7 +213,8 @@
     Max samples per waveform & 12000 & 16384 & 16384 \\ \hline
     \end{tabular}
     \end{table}
-    \textbf{If the overall 512kib data limit (16ki pts at 32 bits) is exceeded, then the AWG will freeze and indicate an error. However, if the total data is less than 512kib and the number of points exceeds the specified limits, then the AWG will fail silently.}
+    \textbf{If the overall 512kib data limit (16ki pts at 32 bits) is exceeded, then the AWG will freeze and indicate an error. However, if the total data is less than 512kib and the number of points exceeds the specified limits, then the AWG will fail silently.}\\\\
+    For the subsequent experiment, we use 16-bit integers and the full sample size of 16,384.
     \subsection*{Spectral Fidelity experiment}
     Now, we can conduct the experiment described last time, where we generate a 80Mhz sinusoidal waveform using the arbitrary waveform function, while increasing the period of the arbitrary waveform. This requires decreasing the sampling frequency, which will also decrease fidelity. We can then test the spectral quality using the spectral analyzer.\\\\
     \textbf{The oscilloscope imposes a maximum frequency of 40MHz for arbitrary waveforms.} Therefore, we start with $n=2,$ where $n$ is the number of sinusoidal waves in the $16,384-$sample window. We also use a voltage of $1V_{pp}$ for all experiments.
@@ -229,6 +231,7 @@
     \includegraphics[width = 5.8in]{img/signal_quality_simple.png}\\
     Oscilloscope view for $n = 4, 1000, 5000,$ showing the progressive deterioration of the signal.
     \end{mdframed}
+    \newpage
     \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 6in]
     \includegraphics[width = 5.8in]{img/signal_quality_simple_spec.png}\\
     Spectrum Analyzer for $n = 4, 1000, 5000,$ showing the progressive deterioration of the signal.
@@ -248,5 +251,73 @@
     \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 6in]
     \includegraphics[width = 5.8in]{img/signal_quality_multi_spec.png}\\
     Spectrum Analyzer for $n = 16, 480, 1600,$ showing the progressive deterioration of the signal.
+    \end{mdframed}
+    \section*{Friday, 3/15}
+    \subsection*{Comparing AWG signal noise to function generator noise}
+    To get a reference for the noise in the AWG signals generated last time, we also run the AWG in the fixed sine wave mode and measure the noise.
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|}
+    \hline
+    Frequency (MHz) & 40 & 80 & 160 \\ \hline
+    Signal Peak (dB) & -3.05 & -3.09 & -3.06 \\ \hline
+    \end{tabular}
+    \end{table}
+    For reference, here is the table when we generate a sine wave at 80mhz using the AWG mode, from the previous experiment:
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|l|l|l|}
+    \hline
+    n & 2 & 10 & 100 & 500 & 1000 & 5000 \\ \hline
+    Amplitude (dBm) & -4.12 & -4.78 & -4.9 & -5.6 & -8 & -15 \\ \hline
+    Signal Period ($\mu s$) & 0.025 & 0.125 & 1.25 & 6.25 & 12.5 & 62.5 \\ \hline
+    \end{tabular}
+    \end{table}
+    As such, we see that the signal from the dedicated function generator mode is about $\sim 1dB$ better than the best attainable signal from the AWG. \textbf{TODO: Get the mixer to perform the test on superpositions of waves}
+    \subsection*{Peak at 0Hz}
+    In general, when using the spectrum analyzer with the AWG, there is a signal peak at 0$Hz$, as shown on the previous images of the spectrum analyzer. The peak remains at 0Hz regardless of how we finely we set the range of the spectral analyzer. We note that the signal peak remains even when the wire is unplugged from the spectrum analyzer, suggesting that it is intrinsic to the spectral analyzer.\\\\
+    Additionally, \href{https://forum.allaboutcircuits.com/threads/spectrum-analyzer-0hz-signal.153650/}{this} forum post suggests that this is due to the internal circuitry of the spectral analyzer. In any case, this seems fine as it does not affect the actual signals we are trying to measure. 
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.1in]
+    \includegraphics[width = 3.8in]{img/zerosignal.jpg}\\
+    Spectrum Analyzer showing the peak at $0Hz$ even when the wire is fully unplugged
+    \end{mdframed}
+    \section*{Tuesday, 3/19}
+    \subsection*{Fine-tuning AWG code}
+    I debugged the command to set the frequency of the AWG directly, and implemented it in the generator code instead of using the command to set the period to indirectly set the frequency. The error was likely due to an input formatting issue, based on the manual. As such, the frequency being set will always be exact, instead of being subject to rounding errors.
+    \subsection*{Mixer}
+    The mixer has 3 different ports, labeled L (LF), I (IF), and R(RF). When we treat the R port as the output port, it gets the two frequencies $f_L \pm f_I,$ namely the sum and difference of the input frequencies. For instance, when we let $L$ be a 85kHz sine wave and $I$ be a 80kHz sine wave, we see the following spectral analyzer output:
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.5in]
+    \includegraphics[width = 4.2in]{img/splitter_spectrum.jpg}\\
+    \end{mdframed}
+    There are two primary peaks at 80 and 90 Mhz, as expected, and there are also subsidiary peaks in 10MHz increments. The amplitudes are as shown:
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|l|}
+    \hline
+    Frequency (MHz) & 70 & 80 & 90 & 100 \\ \hline
+    Signal Peak (dB) & -32.21 & -11.62 & -11.79 & -32.99 \\ \hline
+    \end{tabular}
+    \end{table}
+    Compare this to generating sine waves using the AFG mode, which we test with $n = 8, 32, 256, 512, 1024, 2048$ as before.\\\\
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 4.5in]
+    \includegraphics[width = 4.2in]{img/awg_spectrum.jpg}\\
+    AWG spectrum at $n=8$.
+    \end{mdframed}
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|l|}
+    \hline
+    Frequency (MHz) & 70 & 80 & 90 & 100 \\ \hline
+    n=8 & -23.46 & -7.97 & -8.08 & -23.61 \\ \hline
+    n=32 & -23.28 & -8.20 & -8.41 & -23.13 \\ \hline
+    n=256 & -24.33 & -8.33 & -8.55 & -24.01 \\ \hline
+    n=512 & -25.17 & -9.21 & -8.57 & -26.25 \\ \hline
+    n=1024 & -26.42 & -14.11 & -9.46 & -31.36 \\ \hline
+    \end{tabular}
+    \end{table}
+    Here are the plots of the signal being sent to the AWG at $n=256$ (reasonable) and $n=1024$ (bad):
+    \begin{mdframed}[backgroundcolor=gray!20, align = center, userdefinedwidth = 5.9in]
+    \includegraphics[width = 5.6in]{img/plt_plot_waves.png}\\
+    AWG spectrum at $n=8$.
     \end{mdframed}
 \end{document}
